@@ -1,0 +1,99 @@
+service: trade-service-serverless
+
+useDotenv: true
+variablesResolutionMode: 20210326
+
+plugins:
+  - serverless-dotenv-plugin
+  - serverless-plugin-typescript
+  - serverless-plugin-optimize
+  - serverless-offline
+  - serverless-domain-manager
+
+custom:
+  optimize:
+    external: ['swagger-ui-dist']
+  dotenv:
+    exclude:
+      - DEBUG
+      - NODE_ENV
+      - AUTH_SERVICE_PRODUCTION_USERNAME
+      - AUTH_SERVICE_PRODUCTION_PASSWORD
+      - AUTH_SERVICE_STAGING_USERNAME
+      - AUTH_SERVICE_STAGING_PASSWORD
+  domains:
+    prod: trade-service-sls.cryptosrvc.com
+    dev: trade-service-sls.cryptosrvc-dev.com
+    staging: trade-service-sls.cryptosrvc-staging.com
+  customDomain:
+    domainName: ${self:custom.domains.${self:provider.stage}}
+    basePath: ''
+    stage: ${self:provider.stage}
+    createRoute53Record: true
+  accounts:
+    prod: 640848491082
+    staging: 481321020530
+    dev: 949611028487
+
+provider:
+  name: aws
+  stage: ${opt:stage, 'dev'}
+  runtime: nodejs12.x
+  lambdaHashingVersion: '20201221'
+  environment:
+    AUTH_SERVICE_PRODUCTION_USERNAME: ${ssm:/trade_service/Production/service_auth/username}
+    AUTH_SERVICE_PRODUCTION_PASSWORD: ${ssm:/trade_service/Production/service_auth/password}
+    AUTH_SERVICE_STAGING_USERNAME: ${ssm:/trade_service/Staging/service_auth/username}
+    AUTH_SERVICE_STAGING_PASSWORD: ${ssm:/trade_service/Staging/service_auth/password}
+    DEBUG_DEPTH: 4,
+    DEBUG_COLORS: 1,
+    DEBUG: 'TradeService:*,AllExceptionsFilter:*'
+
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:*
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - 'events:PutEvents'
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - 'lambda:InvokeFunction'
+          Resource: '*'
+
+functions:
+  http:
+    handler: src/lambda.httpHandler
+    timeout: 30
+    events:
+      - http:
+          method: any
+          path: /{any+}
+          cors: true
+  sqsMarketOrderQc:
+    handler: src/lambda.sqsMarketOrderQcHandler
+    timeout: 180
+    events:
+      - sqs: arn:aws:sqs:us-east-1:${self:custom.accounts.${self:provider.stage}}:trade-service-market-order-qc-input
+
+  sqsInstantBuy:
+    handler: src/lambda.sqsInstantBuyHandler
+    timeout: 180
+    events:
+      - sqs: arn:aws:sqs:us-east-1:${self:custom.accounts.${self:provider.stage}}:trade-service-instant-buy-input
+
+  sqsTradeVolume:
+    handler: src/lambda.sqsTradeVolumeHandler
+    timeout: 30
+    events:
+      - sqs: arn:aws:sqs:us-east-1:${self:custom.accounts.${self:provider.stage}}:trade-service-trade-volume-input
+
+  sqsDepositVolume:
+    handler: src/lambda.sqsDepositVolumeHandler
+    timeout: 30
+    events:
+      - sqs: arn:aws:sqs:us-east-1:${self:custom.accounts.${self:provider.stage}}:trade-service-deposit-volume-input
