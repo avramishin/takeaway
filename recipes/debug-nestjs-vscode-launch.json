@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "type": "node",
+        "request": "launch",
+        "name": "Debug Locally (sls-dev)",
+        "args": ["${workspaceFolder}/src/main.ts"],
+        "runtimeArgs": ["--nolazy", "-r", "ts-node/register"],
+        "sourceMaps": true,
+        "env": {
+          "AWS_PROFILE": "default"
+        },
+        "cwd": "${workspaceRoot}",
+        "protocol": "inspector"
+      }
+    ]
+  }
